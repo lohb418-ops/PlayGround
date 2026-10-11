@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Soggy Squirrel: Bad Fur Day in Bubble Bottom</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐿️</text></svg>">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#06283d; font-family:'Trebuchet MS',Verdana,sans-serif; }
+  #app { position:fixed; inset:0; }
+  canvas.game { display:block; }
+  /* ---------- HUD ---------- */
+  #hud { position:fixed; inset:0; pointer-events:none; z-index:10; display:none; }
+  #hud.on { display:block; }
+  .pill { background:rgba(4,30,46,.72); border:2px solid rgba(255,255,255,.25); color:#fff; border-radius:14px; padding:8px 14px; font-weight:bold; text-shadow:0 2px 4px #000; }
+  #topbar { position:absolute; top:10px; left:10px; right:10px; display:flex; gap:10px; align-items:flex-start; justify-content:space-between; }
+  #stats { display:flex; gap:10px; flex-wrap:wrap; }
+  #objective { max-width:420px; font-size:14px; line-height:1.35; }
+  #objective b { color:#ffe066; }
+  #hpwrap { margin-top:8px; display:flex; align-items:center; gap:8px; }
+  #hpbar { width:220px; height:16px; background:#301014; border:2px solid #fff3; border-radius:9px; overflow:hidden; }
+  #hpfill { height:100%; width:100%; background:linear-gradient(90deg,#ff5d5d,#ffb84d); transition:width .2s; }
+  #bossbar { position:absolute; top:86px; left:50%; transform:translateX(-50%); width:min(560px,80vw); display:none; text-align:center; }
+  #bossbar .pill { margin-bottom:6px; display:inline-block; }
+  #bossfillwrap { height:14px; background:#200; border:2px solid #fff6; border-radius:8px; overflow:hidden; }
+  #bossfill { height:100%; width:100%; background:linear-gradient(90deg,#c026d3,#7c3aed); }
+  #minimap { width:150px; height:150px; border-radius:50%; border:3px solid rgba(255,255,255,.4); background:rgba(3,25,40,.8); }
+  #bottombar { position:absolute; bottom:12px; left:12px; right:12px; display:flex; justify-content:space-between; align-items:flex-end; }
+  #controls-hint { font-size:12px; color:#cfefff; }
+  #interact { display:none; pointer-events:none; background:#ffe066; color:#4a2c00; font-weight:900; padding:10px 18px; border-radius:12px; border:3px solid #fff; font-size:16px; animation:bob 0.8s ease-in-out infinite alternate; }
+  @keyframes bob { from{transform:translateY(0)} to{transform:translateY(-6px)} }
+  #toast { position:absolute; bottom:90px; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; gap:6px; align-items:center; }
+  .toastmsg { background:rgba(0,0,0,.75); color:#ffe066; padding:8px 16px; border-radius:10px; font-weight:bold; border:1px solid #ffe06666; animation:fadein .3s; }
+  @keyframes fadein { from{opacity:0; transform:translateY(8px)} to{opacity:1} }
+  #dialog { position:absolute; bottom:90px; left:50%; transform:translateX(-50%); width:min(620px,92vw); background:rgba(8,30,48,.95); border:3px solid #ffe066; border-radius:14px; padding:14px 16px; color:#fff; display:none; pointer-events:auto; }
+  #dialog .who { color:#7dd3fc; font-weight:900; margin-bottom:4px; }
+  #dialog .text { min-height:44px; font-size:15px; line-height:1.45; }
+  #dialog .next { text-align:right; font-size:12px; color:#ffe066; margin-top:6px; }
+  #crosshair { position:absolute; top:50%; left:50%; width:8px; height:8px; margin:-4px; border-radius:50%; background:#ffffffcc; box-shadow:0 0 6px #000; display:none; }
+  /* ---------- Screens ---------- */
+  .screen { position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center; background:radial-gradient(ellipse at center,#0b4a6f 0%,#06283d 70%); }
+  .screen.hidden { display:none; }
+  .card { width:min(680px,94vw); max-height:92vh; overflow:auto; background:linear-gradient(180deg,#0d3b56,#081f31); border:4px solid #ffe066; border-radius:20px; padding:28px 30px; color:#fff; text-align:center; box-shadow:0 20px 80px #000c; }
+  .card h1 { font-size:34px; color:#ffe066; text-shadow:0 3px 0 #7c2d12,0 6px 12px #000; margin-bottom:4px; letter-spacing:.5px; }
+  .card h2 { font-size:15px; color:#7dd3fc; font-weight:normal; margin-bottom:14px; }
+  .card p { font-size:14px; line-height:1.55; color:#d9f3ff; margin:8px 0; }
+  .btn { pointer-events:auto; cursor:pointer; display:inline-block; margin:8px 6px 0; padding:12px 26px; font-size:17px; font-weight:900; color:#4a2c00; background:linear-gradient(180deg,#ffe066,#ffa722); border:3px solid #fff; border-radius:14px; box-shadow:0 4px 0 #92400e; }
+  .btn:active { transform:translateY(3px); box-shadow:none; }
+  .btn.ghost { background:#123; color:#cfefff; border-color:#7dd3fc; box-shadow:none; font-size:14px; padding:9px 18px; }
+  .keys { display:grid; grid-template-columns:1fr 1fr; gap:6px 14px; text-align:left; font-size:13px; margin:12px auto; max-width:480px; background:#0006; padding:12px 16px; border-radius:12px; }
+  .keys b { color:#ffe066; }
+  #loading { font-size:14px; color:#7dd3fc; }
+  #dmgflash { position:fixed; inset:0; pointer-events:none; background:radial-gradient(ellipse at center,transparent 55%,rgba(255,0,0,.55)); opacity:0; z-index:15; transition:opacity .15s; }
+  #healflash { position:fixed; inset:0; pointer-events:none; background:radial-gradient(ellipse at center,transparent 60%,rgba(0,255,150,.4)); opacity:0; z-index:15; transition:opacity .3s; }
+  #quality { position:absolute; top:170px; right:12px; pointer-events:auto; }
+  #quality button { background:#0009; color:#fff; border:1px solid #fff5; border-radius:8px; padding:4px 10px; cursor:pointer; font-size:12px; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="hud">
+  <div id="topbar">
+    <div>
+      <div id="stats">
+        <div class="pill">🐿️ <span id="acorns">0/8</span> acorns</div>
+        <div class="pill">💵 $<span id="cash">0</span></div>
+        <div class="pill">🦀 <span id="crabs">0/5</span> crabs</div>
+        <div class="pill">⚙️ <span id="cog">—</span></div>
+      </div>
+      <div id="hpwrap"><div class="pill">FUR</div><div id="hpbar"><div id="hpfill"></div></div></div>
+      <div class="pill" id="objective" style="margin-top:8px">…</div>
+    </div>
+    <canvas id="minimap" width="150" height="150"></canvas>
+  </div>
+  <div id="quality"><button id="qbtn" title="toggle quality">Quality: High</button></div>
+  <div id="bossbar"><div class="pill">👑 JELLY KING <span id="bosshptext"></span></div><div id="bossfillwrap"><div id="bossfill"></div></div></div>
+  <div id="crosshair"></div>
+  <div id="toast"></div>
+  <div id="dialog"><div class="who" id="dwho"></div><div class="text" id="dtext"></div><div class="next">[E] / click to continue ▸</div></div>
+  <div id="bottombar">
+    <div class="pill" id="controls-hint">WASD move · Mouse look · Space jump ×2 · Click/F slap · E talk/use · Shift run · P pause · M mute</div>
+    <div class="pill" id="interact">E — Use</div>
+  </div>
+</div>
+
+<div id="dmgflash"></div><div id="healflash"></div>
+
+<div class="screen" id="title">
+  <div class="card">
+    <h1>SOGGY SQUIRREL</h1>
+    <h2>Bad Fur Day in <b>Bubble Bottom</b> &nbsp;·&nbsp; an original 3D collectathon parody (desktop)</h2>
+    <p>You are <b style="color:#ffb84d">Nutmeg</b>, a sarcastic squirrel tourist. Your cruise ship sank, your fur is soaked, and the only way home is to earn the <b style="color:#ffe066">Golden Ferry Ticket</b> from the mayor of Bubble Bottom — a cheerful underwater town of fruit-houses, bubble-taxis and very grumpy crabs.</p>
+    <p>Talk to <b style="color:#7dd3fc">Gulliver the Gull</b>, collect <b>8 Golden Acorns</b>, tail-slap <b>5 Grumpy Crabs</b>, help <b>Puffer Pete</b> fix his pump, then face the <b style="color:#e879f9">Jelly King</b>. Context pads <b>(!)</b> work like those old cheeky platformers: stand on one and press <b>E</b>.</p>
+    <div class="keys">
+      <div><b>W A S D</b> — move</div><div><b>Mouse</b> — camera (click to lock)</div>
+      <div><b>Space</b> — jump / double-jump</div><div><b>Click / F</b> — tail slap</div>
+      <div><b>E</b> — talk / use pads / pickup</div><div><b>Shift</b> — run · <b>P</b> pause · <b>M</b> mute</div>
+    </div>
+    <p style="font-size:12px;color:#9db8c9">100% original art, code &amp; music. A loving parody — no copyrighted characters, names or assets. Best on desktop Chrome/Edge with sound on 🔊.</p>
+    <div id="loading">loading reef…</div>
+    <button class="btn" id="playbtn" style="display:none">🎮 DIVE IN</button>
+    <button class="btn ghost" id="howbtn" style="display:none">How to play</button>
+    <div id="howtext" style="display:none;text-align:left;font-size:13px;background:#0007;padding:12px;border-radius:10px;margin-top:10px">
+      <b style="color:#ffe066">Quest order:</b> ① Talk to the gull on the plaza (E). ② Grab 8 golden acorns (walk over them; some are on clam platforms — use the bouncing coral pad). ③ Slap 5 crabs (Click/F when close). ④ Take the rusty cog from the chest on Crab Rock (E) to Puffer Pete at the pump station. ⑤ Enter the Jelly Arena and bonk the Jelly King 6 times — dodge his minis! Buy a Kelp Shake ($40) at the vending pad to heal anytime.<br><br>
+      <b style="color:#ffe066">Tips:</b> bubbles heal +5 slowly. Falling in the trench costs 10 HP and respawns you. Run (Shift) to outrun crabs.
+    </div>
+  </div>
+</div>
+
+<div class="screen hidden" id="pause">
+  <div class="card"><h1>PAUSED</h1><p>Nutmeg is holding his breath…</p>
+    <button class="btn" id="resumebtn">Resume</button>
+    <button class="btn ghost" id="restartbtn">Restart day</button>
+    <button class="btn ghost" id="mutewbtn">Mute: off</button>
+  </div>
+</div>
+
+<div class="screen hidden" id="end">
+  <div class="card"><h1 id="endtitle">YOU DID IT!</h1><h2 id="endsub"></h2><p id="endstats"></p>
+    <button class="btn" id="againbtn">Play again</button>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ============================================================
+   SOGGY SQUIRREL: Bad Fur Day in Bubble Bottom
+   Original parody collectathon. All geometry procedural,
+   all audio synthesized. No third-party assets.
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const rand=(a,b)=>a+Math.random()*(b-a);
+
+// ---------- tiny synth audio (original bleeps) ----------
+let AC=null, muted=false, musicTimer=null;
+function audio(){ if(!AC){ AC=new (window.AudioContext||window.webkitAudioContext)(); } if(AC.state==='suspended')AC.resume(); return AC; }
+function beep(f=440,d=0.12,type='square',v=0.12,slide=0){
+  if(muted) return; try{
+    const ac=audio(),o=ac.createOscillator(),g=ac.createGain();
+    o.type=type;o.frequency.setValueAtTime(f,ac.currentTime);
+    if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(30,f+slide),ac.currentTime+d);
+    g.gain.setValueAtTime(v,ac.currentTime); g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+d);
+    o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime+d);
+  }catch(e){}
+}
+const sfx={
+  jump(){beep(300,0.18,'square',0.10,300);}, dbl(){beep(500,0.15,'square',0.10,400);},
+  coin(){beep(880,0.09,'square',0.09);setTimeout(()=>beep(1320,0.14,'square',0.09),70);},
+  cash(){beep(660,0.08,'triangle',0.12);setTimeout(()=>beep(990,0.12,'triangle',0.12),80);},
+  slap(){beep(180,0.12,'sawtooth',0.14,-100);}, hit(){beep(140,0.25,'sawtooth',0.16,-60);flashDmg();},
+  talk(){beep(520,0.06,'sine',0.08,80);}, heal(){beep(520,0.2,'sine',0.1,300);},
+  pad(){beep(240,0.3,'square',0.1,480);}, boss(){beep(90,0.5,'sawtooth',0.16,40);},
+  win(){[523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,0.25,'triangle',0.12),i*140));},
+  lose(){[400,300,220,150].forEach((f,i)=>setTimeout(()=>beep(f,0.3,'sawtooth',0.1),i*160));}
+};
+function startMusic(){
+  if(musicTimer||muted) return;
+  const bass=[110,110,130.8,98,110,110,146.8,130.8]; let i=0;
+  musicTimer=setInterval(()=>{ if(!muted&&playing&&!paused) beep(bass[i%bass.length],0.22,'triangle',0.045); i++; },300);
+}
+function flashDmg(){ const f=$('dmgflash'); f.style.opacity=1; setTimeout(()=>f.style.opacity=0,180); }
+function flashHeal(){ const f=$('healflash'); f.style.opacity=1; setTimeout(()=>f.style.opacity=0,350); }
+
+// ---------- renderer / scene ----------
+const app=$('app');
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.domElement.className='game';
+app.appendChild(renderer.domElement);
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x0a4a6e);
+scene.fog=new THREE.FogExp2(0x0a4a6e,0.016);
+
+const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,0.1,400);
+const hemi=new THREE.HemisphereLight(0xbfe9ff,0x1a4a3a,0.95); scene.add(hemi);
+const sun=new THREE.DirectionalLight(0xfff2cc,1.5);
+sun.position.set(40,60,20); sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=-70;sun.shadow.camera.right=70;sun.shadow.camera.top=70;sun.shadow.camera.bottom=-70;
+scene.add(sun);
+scene.add(new THREE.AmbientLight(0x557799,0.85));
+
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+
+// ---------- underwater look: water surface + god rays + bubbles ----------
+{
+  const wgeo=new THREE.PlaneGeometry(400,400,1,1);
+  const wmat=new THREE.MeshBasicMaterial({color:0x66d9ff,transparent:true,opacity:0.28,side:THREE.DoubleSide});
+  const water=new THREE.Mesh(wgeo,wmat); water.rotation.x=Math.PI/2; water.position.y=26; scene.add(water);
+  water.onBeforeRender=()=>{ wmat.opacity=0.22+Math.sin(performance.now()*0.001)*0.06; };
+  // light rays
+  const rayMat=new THREE.MeshBasicMaterial({color:0xbfefff,transparent:true,opacity:0.07,side:THREE.DoubleSide,depthWrite:false});
+  for(let i=0;i<8;i++){
+    const r=new THREE.Mesh(new THREE.PlaneGeometry(rand(3,7),60),rayMat);
+    r.position.set(rand(-50,50),12,rand(-50,50)); r.rotation.z=0.25; r.rotation.y=rand(0,3); scene.add(r);
+  }
+}
+// sandy ground with painted paths
+function groundTexture(){
+  const c=document.createElement('canvas');c.width=c.height=512;const g=c.getContext('2d');
+  g.fillStyle='#c2a15c';g.fillRect(0,0,512,512);
+  for(let i=0;i<2600;i++){g.fillStyle=`rgba(${140+Math.random()*80|0},${110+Math.random()*60|0},60,0.35)`;g.fillRect(Math.random()*512,Math.random()*512,2,2);}
+  g.strokeStyle='#8fcf6f';g.lineWidth=26;g.lineCap='round';
+  g.beginPath();g.moveTo(256,256);g.lineTo(256,40);g.moveTo(256,256);g.lineTo(60,330);g.moveTo(256,256);g.lineTo(450,320);g.moveTo(256,256);g.lineTo(300,470);g.stroke();
+  g.strokeStyle='#a8e07f';g.lineWidth=14;g.beginPath();g.moveTo(256,256);g.lineTo(256,40);g.moveTo(256,256);g.lineTo(60,330);g.moveTo(256,256);g.lineTo(450,320);g.moveTo(256,256);g.lineTo(300,470);g.stroke();
+  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(3,3);return t;
+}
+const WORLD=120;
+{
+  const g=new THREE.Mesh(new THREE.PlaneGeometry(WORLD*2.2,WORLD*2.2),new THREE.MeshStandardMaterial({map:groundTexture(),roughness:1}));
+  g.rotation.x=-Math.PI/2;g.receiveShadow=true;scene.add(g);
+  // trench (fall zone) ring
+  const trench=new THREE.Mesh(new THREE.RingGeometry(52,60,48),new THREE.MeshStandardMaterial({color:0x03121e,roughness:1}));
+  trench.rotation.x=-Math.PI/2;trench.position.y=0.02;scene.add(trench);
+  const wall=new THREE.Mesh(new THREE.CylinderGeometry(60,60,8,48,1,true),new THREE.MeshStandardMaterial({color:0x0a2a44,side:THREE.DoubleSide}));
+  wall.position.y=-4;scene.add(wall);
+}
+
+// ---------- colliders / registry ----------
+const solids=[]; // {x,z,r} circles, {x,z,hx,hz} boxes
+const pads=[], acorns=[], cashDrops=[], enemies=[], npcs=[], platforms=[], bubbles=[];
+function addCircle(x,z,r){solids.push({x,z,r});}
+function addBox(x,z,hx,hz){solids.push({x,z,hx,hz,box:true});}
+function collide(px,pz,rad=0.7){
+  for(const s of solids){
+    if(s.box){ const dx=Math.max(Math.abs(px-s.x)-s.hx,0),dz=Math.max(Math.abs(pz-s.z)-s.hz,0);
+      if(dx*dx+dz*dz<rad*rad) return s; }
+    else { const dx=px-s.x,dz=pz-s.z; if(dx*dx+dz*dz<(s.r+rad)*(s.r+rad)) return s; }
+  }
+  return null;
+}
+function pushOut(p,rad=0.7){
+  const s=collide(p.x,p.z,rad); if(!s) return;
+  if(s.box){ const dx=p.x-s.x,dz=p.z-s.z;
+    const ox=(s.hx+rad)-Math.abs(dx), oz=(s.hz+rad)-Math.abs(dz);
+    if(ox<oz) p.x=s.x+Math.sign(dx||1)*(s.hx+rad); else p.z=s.z+Math.sign(dz||1)*(s.hz+rad);
+  } else { const dx=p.x-s.x,dz=p.z-s.z,d=Math.hypot(dx,dz)||0.01; p.x=s.x+dx/d*(s.r+rad); p.z=s.z+dz/d*(s.r+rad); }
+}
+
+// ---------- builders (all original) ----------
+function mat(c,r=0.8){return new THREE.MeshStandardMaterial({color:c,roughness:r});}
+function fruitHouse(x,z,bodyC,roofC,scale=1,label=''){
+  const g=new THREE.Group();g.position.set(x,0,z);
+  const body=new THREE.Mesh(new THREE.SphereGeometry(3*scale,18,14),mat(bodyC,0.9));
+  body.scale.y=1.15;body.position.y=3.2*scale;body.castShadow=true;g.add(body);
+  // crosshatch
+  for(let i=-2;i<=2;i++){const l=new THREE.Mesh(new THREE.TorusGeometry(3.02*scale,0.05*scale,6,24,Math.PI),mat(0x6b4a1f,1));
+    l.position.y=3.2*scale;l.rotation.z=0;g.add(l);}
+  const roof=new THREE.Mesh(new THREE.ConeGeometry(2.2*scale,2.4*scale,10),mat(roofC,0.9));
+  roof.position.y=7.4*scale;roof.castShadow=true;g.add(roof);
+  const door=new THREE.Mesh(new THREE.PlaneGeometry(1.4*scale,2.2*scale),mat(0x5b3a1a,1));
+  door.position.set(0,1.4*scale,3.0*scale);door.rotation.y=0;g.add(door);
+  const win=new THREE.Mesh(new THREE.CircleGeometry(0.6*scale,12),new THREE.MeshStandardMaterial({color:0xbfefff,emissive:0x88ccff,emissiveIntensity:0.7}));
+  win.position.set(1.4*scale,4*scale,2.6*scale);win.rotation.y=0.4;g.add(win);
+  const chim=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,1.6,8),mat(0x888888));chim.position.set(-1.2*scale,8*scale,0);g.add(chim);
+  if(label){const cv=document.createElement('canvas');cv.width=256;cv.height=64;const c2=cv.getContext('2d');
+    c2.fillStyle='#3a2200';c2.fillRect(0,0,256,64);c2.fillStyle='#ffe066';c2.font='bold 30px sans-serif';c2.textAlign='center';c2.fillText(label,128,42);
+    const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv)}));sp.scale.set(4,1,1);sp.position.y=6*scale;g.add(sp);}
+  // leaves
+  for(let i=0;i<5;i++){const leaf=new THREE.Mesh(new THREE.ConeGeometry(0.5*scale,1.6*scale,6),mat(0x3fa34d));
+    leaf.position.set(rand(-1,1)*scale,(8.6+i*0.25)*scale,rand(-1,1)*scale);leaf.rotation.z=rand(-0.6,0.6);g.add(leaf);}
+  scene.add(g);addCircle(x,z,3.4*scale);return g;
+}
+function coral(x,z,c,h=3){
+  const g=new THREE.Group();g.position.set(x,0,z);
+  for(let i=0;i<5;i++){const b=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.3,rand(1.5,h),6),mat(c));
+    b.position.set(rand(-1,1),h/2,rand(-1,1));b.rotation.z=rand(-0.4,0.4);b.castShadow=true;g.add(b);
+    const tip=new THREE.Mesh(new THREE.SphereGeometry(0.3,8,8),mat(0xff9ecf));tip.position.copy(b.position);tip.position.y+=rand(0.8,h/2);g.add(tip);}
+  scene.add(g);addCircle(x,z,1.1);return g;
+}
+function rockF(x,z,s=2){
+  const r=new THREE.Mesh(new THREE.DodecahedronGeometry(s,0),mat(0x7d8aa0,1));
+  r.position.set(x,s*0.5,z);r.rotation.set(rand(0,3),rand(0,3),0);r.castShadow=true;scene.add(r);addCircle(x,z,s*0.9);return r;
+}
+function acornMesh(){
+  const g=new THREE.Group();
+  const nut=new THREE.Mesh(new THREE.SphereGeometry(0.45,12,10),new THREE.MeshStandardMaterial({color:0xffd34d,emissive:0xaa7700,emissiveIntensity:0.6,roughness:0.3}));
+  nut.scale.y=1.2;g.add(nut);
+  const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.34,0.42,0.25,10),mat(0x8a5a1e));cap.position.y=0.5;g.add(cap);
+  const stem=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.3,6),mat(0x5b3a1a));stem.position.y=0.7;g.add(stem);
+  const glow=new THREE.PointLight(0xffd34d,6,6);glow.position.y=0.5;g.add(glow);
+  return g;
+}
+function cashMesh(){
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(0.9,0.45),new THREE.MeshStandardMaterial({color:0x7CFC00,side:THREE.DoubleSide,emissive:0x1a5c00,emissiveIntensity:0.5}));
+  return m;
+}
+function crabMesh(){
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.SphereGeometry(0.7,12,10),mat(0xe23b3b,0.7));body.scale.set(1.3,0.7,1);body.castShadow=true;g.add(body);
+  const eye1=new THREE.Mesh(new THREE.SphereGeometry(0.16,8,8),mat(0xffffff,0.3));eye1.position.set(0.25,0.55,0.4);g.add(eye1);
+  const eye2=eye1.clone();eye2.position.x=-0.25;g.add(eye2);
+  const p1=new THREE.Mesh(new THREE.SphereGeometry(0.13,8,8),mat(0x111111));p1.position.set(0.25,0.6,0.52);g.add(p1);
+  const p2=p1.clone();p2.position.x=-0.25;g.add(p2);
+  for(const s of[-1,1]){const claw=new THREE.Mesh(new THREE.SphereGeometry(0.34,8,8),mat(0xff6b6b));claw.position.set(s*1.1,0.2,0.4);g.add(claw);
+    for(let l=0;l<3;l++){const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.8,6),mat(0xb91c1c));leg.position.set(s*0.8,-0.2,-0.3+l*0.3);leg.rotation.z=s*0.7;g.add(leg);}}
+  g.userData.claws=[g.children[4],g.children[5]];
+  return g;
+}
+function jellyMesh(big=false){
+  const g=new THREE.Group();const s=big?2.4:1;
+  const dome=new THREE.Mesh(new THREE.SphereGeometry(0.8*s,14,10,0,Math.PI*2,0,Math.PI/2),new THREE.MeshStandardMaterial({color:big?0xc026d3:0xff9edf,transparent:true,opacity:0.85,roughness:0.3,emissive:big?0x7c3aed:0xff5fa2,emissiveIntensity:0.4}));
+  dome.castShadow=true;g.add(dome);
+  for(let i=0;i<(big?10:6);i++){const t=new THREE.Mesh(new THREE.CylinderGeometry(0.05*s,0.03*s,1.4*s,5),mat(0xffc7ea,0.6));
+    const a=i/(big?10:6)*Math.PI*2;t.position.set(Math.cos(a)*0.5*s,-0.7*s,Math.sin(a)*0.5*s);g.add(t);g.userData['t'+i]=t;}
+  const e1=new THREE.Mesh(new THREE.SphereGeometry(0.12*s,8,8),mat(0x111111));e1.position.set(0.25*s,0.35*s,0.65*s);g.add(e1);
+  const e2=e1.clone();e2.position.x=-0.25*s;g.add(e2);
+  if(big){const crown=new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.5,0.4,8),new THREE.MeshStandardMaterial({color:0xffd34d,emissive:0xaa7700,emissiveIntensity:0.6}));crown.position.y=0.85*s;g.add(crown);}
+  return g;
+}
+function padMesh(label,color=0xffe066){
+  const g=new THREE.Group();
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.7,0.3,20),mat(0x334155,0.6));base.position.y=0.15;base.receiveShadow=true;g.add(base);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(1.2,0.12,8,24),new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:1}));
+  ring.rotation.x=Math.PI/2;ring.position.y=0.45;g.add(ring);g.userData.ring=ring;
+  const cv=document.createElement('canvas');cv.width=128;cv.height=128;const c=cv.getContext('2d');
+  c.fillStyle='#111';c.beginPath();c.arc(64,64,60,0,7);c.fill();c.fillStyle='#fff';c.font='bold 72px sans-serif';c.textAlign='center';c.fillText(label,64,90);
+  const top=new THREE.Mesh(new THREE.CircleGeometry(1.0,20),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cv)}));
+  top.rotation.x=-Math.PI/2;top.position.y=0.32;g.add(top);
+  scene.add(g);return g;
+}
+
+// ---------- town layout ----------
+fruitHouse(-14,-12,0xf5a623,0x2e7d32,1.1,'PINE-NOT');
+fruitHouse(15,-14,0xe07b39,0x6a1b9a,1.0,'TIKI TOM');
+fruitHouse(-20,12,0x9ccc65,0xef6c00,0.9,'MELON HUT');
+fruitHouse(22,10,0xff8a65,0x00838f,1.2,'BUBBLE INN');
+fruitHouse(2,-30,0xffd54f,0xad1457,0.85,'JUICE BAR');
+// Rusty Anchor Diner (original)
+{
+  const g=new THREE.Group();g.position.set(-2,0,28);
+  const base=new THREE.Mesh(new THREE.BoxGeometry(10,4,6),mat(0x8d6e63));base.position.y=2;base.castShadow=true;g.add(base);
+  const roof=new THREE.Mesh(new THREE.CylinderGeometry(0.1,4.5,3,4),mat(0xb71c1c));roof.position.y=5.5;roof.rotation.y=Math.PI/4;g.add(roof);
+  const anchor=new THREE.Mesh(new THREE.TorusGeometry(1,0.2,8,16),new THREE.MeshStandardMaterial({color:0xffd34d,emissive:0x554400,emissiveIntensity:0.5}));
+  anchor.position.set(0,3,3.1);g.add(anchor);
+  const cv=document.createElement('canvas');cv.width=512;cv.height=80;const c=cv.getContext('2d');
+  c.fillStyle='#2b1608';c.fillRect(0,0,512,80);c.fillStyle='#ffe066';c.font='bold 40px sans-serif';c.textAlign='center';c.fillText('RUSTY ANCHOR DINER',256,54);
+  const sign=new THREE.Mesh(new THREE.PlaneGeometry(8,1.2),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cv)}));
+  sign.position.set(0,4.4,3.05);g.add(sign);
+  scene.add(g);addBox(-2,28,5.4,3.4);
+}
+// pump station
+const pumpPos=new THREE.Vector3(34,0,26);
+{
+  const g=new THREE.Group();g.position.copy(pumpPos);
+  const tank=new THREE.Mesh(new THREE.CylinderGeometry(2,2,4,14),mat(0x00838f));tank.position.y=2;tank.castShadow=true;g.add(tank);
+  const pipe=new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,6,8),mat(0x90a4ae));pipe.rotation.z=Math.PI/2;pipe.position.set(-4,1,0);g.add(pipe);
+  const wheel=new THREE.Mesh(new THREE.TorusGeometry(0.9,0.15,8,16),mat(0xd32f2f));wheel.position.set(2.2,2.5,0);g.add(wheel);g.userData.wheel=wheel;
+  scene.add(g);addCircle(pumpPos.x,pumpPos.z,2.6);window._pumpWheel=wheel;
+}
+// vending machine (heals)
+const vendPos=new THREE.Vector3(8,0,20);
+{
+  const g=new THREE.Group();g.position.copy(vendPos);
+  const box=new THREE.Mesh(new THREE.BoxGeometry(2,3,1.4),mat(0x2e7d32));box.position.y=1.5;box.castShadow=true;g.add(box);
+  const glass=new THREE.Mesh(new THREE.PlaneGeometry(1.4,1.6),new THREE.MeshStandardMaterial({color:0xbfefff,emissive:0x2288aa,emissiveIntensity:0.6}));
+  glass.position.set(0,1.8,0.72);g.add(glass);
+  const cv=document.createElement('canvas');cv.width=256;cv.height=64;const c=cv.getContext('2d');
+  c.fillStyle='#062';c.fillRect(0,0,256,64);c.fillStyle='#fff';c.font='bold 26px sans-serif';c.textAlign='center';c.fillText('KELP SHAKE $40',128,42);
+  const sign=new THREE.Mesh(new THREE.PlaneGeometry(2,0.5),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cv)}));
+  sign.position.set(0,3.1,0.72);g.add(sign);
+  scene.add(g);addBox(vendPos.x,vendPos.z,1.2,1);
+}
+// chest rock + arena gate
+const chestPos=new THREE.Vector3(-34,0,-24);
+{
+  rockF(-34,-24,3);rockF(-38,-20,2);rockF(-30,-28,1.6);
+  const chest=new THREE.Group();chest.position.set(-34,0.6,-24);
+  const b=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.9,1),mat(0x6d4c41));b.position.y=0.45;b.castShadow=true;chest.add(b);
+  const lid=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.4,1),mat(0x8d6e63));lid.position.y=1.05;chest.add(lid);chest.userData.lid=lid;
+  const glow=new THREE.PointLight(0xffe066,8,8);glow.position.y=1.5;chest.add(glow);
+  scene.add(chest);window._chest=chest;
+}
+const gatePos=new THREE.Vector3(0,0,44);
+{
+  for(const s of[-1,1]){const p=new THREE.Mesh(new THREE.CylinderGeometry(1,1.2,9,10),mat(0x546e7a));p.position.set(s*5,4.5,44);p.castShadow=true;scene.add(p);}
+  const bar=new THREE.Mesh(new THREE.BoxGeometry(11,1.4,1),new THREE.MeshStandardMaterial({color:0xc026d3,emissive:0x7c3aed,emissiveIntensity:0.7}));
+  bar.position.set(0,7,44);scene.add(bar);window._gateBar=bar;
+  addBox(-5,44,1,1);addBox(5,44,1,1);
+}
+// corals/rocks decor
+coral(-8,-4,0xff6f91);coral(10,-6,0x4dd0e1);coral(-26,2,0xff6f91);coral(28,-2,0xba68c8);
+coral(-12,24,0x4dd0e1);coral(18,24,0xff6f91);coral(40,8,0x4dd0e1);coral(-40,28,0xba68c8);
+rockF(8,-20,1.5);rockF(-6,8,1.2);rockF(40,-14,2);rockF(-44,-6,2);
+// clam platforms (jump route to high acorns)
+function clamPlatform(x,y,z){
+  const g=new THREE.Group();g.position.set(x,y,z);
+  const bot=new THREE.Mesh(new THREE.SphereGeometry(1.6,12,8,0,Math.PI*2,Math.PI/2,Math.PI/2),mat(0xe1bee7,0.7));
+  bot.rotation.x=Math.PI;g.add(bot);
+  const top=new THREE.Mesh(new THREE.SphereGeometry(1.6,12,8,0,Math.PI*2,0,Math.PI/2),mat(0xce93d8,0.7));
+  top.position.y=0.5;top.rotation.x=0.35;g.add(top);g.userData.top=top;
+  g.userData.baseY=y;scene.add(g);platforms.push({pos:g.position,r:1.7,y,mesh:g});return g;
+}
+clamPlatform(12,1.2,-2);clamPlatform(16,2.4,-6);clamPlatform(20,3.6,-10);clamPlatform(-16,1.2,20);clamPlatform(-20,2.6,24);
+// bridge planks (appear after pump fixed)
+const bridgePlanks=[];
+{
+  for(let i=0;i<6;i++){const p=new THREE.Mesh(new THREE.BoxGeometry(2.4,0.3,3),mat(0x8d6e63));
+    p.position.set(-20+i*3.2,0.4,44);p.visible=false;scene.add(p);bridgePlanks.push(p);}
+}
+// arena
+const arenaC=new THREE.Vector3(0,0,58);
+{
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(12,1,10,32),mat(0x7c3aed,0.6));
+  ring.rotation.x=Math.PI/2;ring.position.set(0,0.3,58);scene.add(ring);
+}
+
+// ---------- acorns / cash placement ----------
+const acornSpots=[[12,2.6,-2],[16,3.8,-6],[20,5,-10],[-16,2.6,20],[-20,4,24],[30,1,-20],[-30,1,6],[0,1,34],[24,1,22],[-8,1,-26]];
+acornSpots.forEach(([x,y,z],i)=>{
+  const m=acornMesh();m.position.set(x,y,z);scene.add(m);
+  acorns.push({mesh:m,taken:false,phase:rand(0,6)});
+});
+
+// ---------- NPCs ----------
+function gullMesh(){
+  const g=new THREE.Group();
+  const b=new THREE.Mesh(new THREE.SphereGeometry(0.6,12,10),mat(0xffffff,0.8));b.scale.set(1,1.1,1.3);b.position.y=1;g.add(b);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.4,12,10),mat(0xffffff));head.position.set(0,1.8,0.4);g.add(head);
+  const beak=new THREE.Mesh(new THREE.ConeGeometry(0.18,0.5,8),mat(0xffa722));beak.rotation.x=Math.PI/2;beak.position.set(0,1.75,0.95);g.add(beak);
+  for(const s of[-1,1]){const w=new THREE.Mesh(new THREE.BoxGeometry(1.1,0.12,0.5),mat(0xe1f5fe));w.position.set(s*0.7,1.1,-0.1);g.add(w);}
+  for(const s of[-1,1]){const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.6,6),mat(0xffa722));leg.position.set(s*0.2,0.3,0);g.add(leg);}
+  const hat=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.35,0.3,10),mat(0x2e7d32));hat.position.set(0.1,2.15,0.4);hat.rotation.z=0.2;g.add(hat);
+  return g;
+}
+function pufferMesh(){
+  const g=new THREE.Group();
+  const b=new THREE.Mesh(new THREE.SphereGeometry(0.9,14,12),mat(0xffd54f,0.7));b.position.y=1.1;b.castShadow=true;g.add(b);
+  for(let i=0;i<10;i++){const sp=new THREE.Mesh(new THREE.ConeGeometry(0.09,0.35,6),mat(0xe65100));
+    const a=i/10*Math.PI*2;sp.position.set(Math.cos(a)*0.95,1.1+Math.sin(i*2)*0.3,Math.sin(a)*0.95);sp.rotation.z=-a;g.add(sp);}
+  for(const s of[-1,1]){const e=new THREE.Mesh(new THREE.SphereGeometry(0.18,8,8),mat(0xffffff));e.position.set(s*0.3,1.4,0.75);g.add(e);
+    const p=new THREE.Mesh(new THREE.SphereGeometry(0.08,8,8),mat(0x111111));p.position.set(s*0.3,1.4,0.9);g.add(p);}
+  const wrench=new THREE.Mesh(new THREE.BoxGeometry(0.15,1,0.15),mat(0x90a4ae));wrench.position.set(1.1,1,0.2);wrench.rotation.z=0.5;g.add(wrench);
+  return g;
+}
+function mayorMesh(){
+  const g=new THREE.Group();
+  const b=new THREE.Mesh(new THREE.SphereGeometry(0.8,12,10),mat(0x4dd0e1,0.7));b.position.y=1;b.castShadow=true;g.add(b);
+  const hat=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.55,0.6,10),mat(0x111111));hat.position.y=2;g.add(hat);
+  const band=new THREE.Mesh(new THREE.CylinderGeometry(0.52,0.52,0.15,10),mat(0xd32f2f));band.position.y=1.85;g.add(band);
+  return g;
+}
+const gull={mesh:gullMesh(),pos:new THREE.Vector3(8,0,1),name:'Gulliver the Gull'};
+gull.mesh.position.copy(gull.pos);scene.add(gull.mesh);npcs.push(gull);
+const pete={mesh:pufferMesh(),pos:new THREE.Vector3(31,0,24),name:'Puffer Pete'};
+pete.mesh.position.copy(pete.pos);scene.add(pete.mesh);npcs.push(pete);
+const mayor={mesh:mayorMesh(),pos:new THREE.Vector3(-4,0,52),name:'Mayor Bubbles'};
+mayor.mesh.position.copy(mayor.pos);scene.add(mayor.mesh);npcs.push(mayor);
+
+// ---------- pads ----------
+function makePad(x,z,label,color,action,hint){
+  const mesh=padMesh(label,color);mesh.position.set(x,0,z);scene.add(mesh);
+  pads.push({x,z,mesh,action,hint,label});
+}
+makePad(-10,0,'↟',0x4ade80,()=>{ player.vy=13; sfx.pad(); toast('Bouncy coral! Wheee!'); },'Bounce coral','bounce');
+makePad(26,32,'🔧',0x38bdf8,()=>{ tryFixPump(true); },'Pump helper','pump');
+makePad(8,17,'🥤',0xfbbf24,()=>{ buyShake(); },'Kelp Shake $40 (heal)','shop');
+makePad(-30,-18,'💨',0xf472b6,()=>{ // cannon to chest rock
+  player.pos.set(-33,6,-21); player.vy=2; sfx.pad(); toast('Bubble cannon! Hold on!'); },'Bubble cannon','cannon');
+
+// ---------- player (original squirrel) ----------
+function squirrelMesh(){
+  const g=new THREE.Group();
+  const fur=mat(0xd97b2b,0.8),cream=mat(0xffe3b3,0.8);
+  const body=new THREE.Mesh(new THREE.SphereGeometry(0.55,14,12),fur);body.position.y=0.85;body.castShadow=true;g.add(body);
+  const belly=new THREE.Mesh(new THREE.SphereGeometry(0.38,12,10),cream);belly.position.set(0,0.8,0.32);belly.scale.set(0.8,1,0.6);g.add(belly);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.42,14,12),fur);head.position.set(0,1.55,0.1);head.castShadow=true;g.add(head);
+  const snout=new THREE.Mesh(new THREE.SphereGeometry(0.2,10,8),cream);snout.position.set(0,1.45,0.48);g.add(snout);
+  const nose=new THREE.Mesh(new THREE.SphereGeometry(0.07,8,8),mat(0x3b1d0c));nose.position.set(0,1.5,0.66);g.add(nose);
+  for(const s of[-1,1]){
+    const ear=new THREE.Mesh(new THREE.ConeGeometry(0.16,0.4,6),fur);ear.position.set(s*0.28,1.95,0.05);g.add(ear);
+    const tuft=new THREE.Mesh(new THREE.ConeGeometry(0.08,0.2,6),cream);tuft.position.set(s*0.28,2.05,0.05);g.add(tuft);
+    const eye=new THREE.Mesh(new THREE.SphereGeometry(0.11,8,8),mat(0xffffff,0.3));eye.position.set(s*0.17,1.62,0.44);g.add(eye);
+    const pup=new THREE.Mesh(new THREE.SphereGeometry(0.05,8,8),mat(0x111111));pup.position.set(s*0.17,1.62,0.53);g.add(pup);
+    const arm=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.5,6),fur);arm.position.set(s*0.6,0.9,0.15);arm.rotation.z=s*0.4;g.add(arm);
+    const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.13,0.5,6),fur);leg.position.set(s*0.25,0.3,0);g.add(leg);
+  }
+  const tail=new THREE.Group();tail.position.set(0,0.9,-0.5);
+  for(let i=0;i<4;i++){const seg=new THREE.Mesh(new THREE.SphereGeometry(0.32-i*0.04,10,8),i%2?cream:fur);
+    seg.position.set(0,i*0.3,-i*0.28);seg.castShadow=true;tail.add(seg);}
+  tail.rotation.x=-0.5;g.add(tail);g.userData.tail=tail;g.userData.body=body;
+  // swim goggles (soggy tourist!)
+  const strap=new THREE.Mesh(new THREE.TorusGeometry(0.4,0.05,6,14),mat(0x222222));strap.position.set(0,1.66,0.12);strap.rotation.x=0.2;g.add(strap);
+  return g;
+}
+const player={
+  mesh:squirrelMesh(), pos:new THREE.Vector3(4,0,12), vel:new THREE.Vector3(),
+  vy:0, yaw:Math.PI, camYaw:Math.PI, camPitch:0.32, grounded:false,
+  hp:100, maxHp:100, acorns:0, cash:0, crabsSlapped:0, hasCog:false, pumpFixed:false,
+  jumps:0, slapCd:0, hurtCd:0, run:false, dead:false
+};
+player.mesh.position.copy(player.pos);scene.add(player.mesh);
+
+// ---------- enemies ----------
+function spawnCrab(x,z){
+  const mesh=crabMesh();mesh.position.set(x,0,z);scene.add(mesh);
+  enemies.push({type:'crab',mesh,hp:2,x,z,vx:0,vz:0,phase:rand(0,6),hitCd:0,alive:true});
+}
+[[18,4],[-10,-14],[26,-8],[-24,-8],[10,30],[-16,32],[36,12],[-36,8],[14,-26],[-12,-30]].forEach(([x,z])=>spawnCrab(x,z));
+function spawnJelly(x,z,big=false){
+  const mesh=jellyMesh(big);mesh.position.set(x,big?3:rand(1.5,3),z);scene.add(mesh);
+  const e={type:big?'king':'jelly',mesh,hp:big?6:1,x,z,big,phase:rand(0,6),hitCd:0,alive:true,t:0};
+  enemies.push(e);return e;
+}
+[[40,30],[-38,-32],[24,-30],[-28,36]].forEach(([x,z])=>spawnJelly(x,z));
+let boss=null, bossDefeated=false;
+
+// ---------- ambient bubbles ----------
+{
+  const n=160, pos=new Float32Array(n*3);
+  for(let i=0;i<n;i++){pos[i*3]=rand(-60,60);pos[i*3+1]=rand(0,24);pos[i*3+2]=rand(-60,60);}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  const m=new THREE.PointsMaterial({color:0xbfefff,size:0.25,transparent:true,opacity:0.7});
+  const pts=new THREE.Points(g,m);scene.add(pts);window._bubblePts=pts;
+}
+
+// ---------- game state / quests ----------
+let playing=false, paused=false, started=false;
+let quest=0; // 0 talk gull,1 acorns,2 crabs,3 cog+pump,4 boss,5 done
+let gateOpen=false, elapsed=0;
+const OBJECTIVES=[
+  'Talk to <b>Gulliver the Gull</b> on the plaza (walk up, press <b>E</b>).',
+  'Collect <b>8 Golden Acorns</b> scattered in Bubble Bottom. Use the green ↟ coral pad & clam platforms!',
+  'Tail-slap <b>5 Grumpy Crabs</b> (Left-click / F when close). They drop cash!',
+  'Grab the <b>Rusty Cog</b> from the chest on Crab Rock (pink cannon pad flies you there), then bring it to <b>Puffer Pete</b> by the pump.',
+  'The Jelly Arena gate is open! Defeat the <b>JELLY KING</b> — bonk him 6 times, dodge minis. Good luck!',
+  'You saved Bubble Bottom! Talk to <b>Mayor Bubbles</b> by the gate for your ticket. 🎫'
+];
+function setObjective(){
+  if(quest===4&&bossDefeated){ $('objective').innerHTML='⭐ <b>Jelly King defeated!</b> Talk to <b>Mayor Bubbles</b> by the gate for your ticket! 🎫'; updateHUD(); return; }
+  $('objective').innerHTML='⭐ '+OBJECTIVES[Math.min(quest,5)]; updateHUD(); }
+function toast(msg,ms=2600){
+  const d=document.createElement('div');d.className='toastmsg';d.textContent=msg;$('toast').appendChild(d);
+  setTimeout(()=>{d.style.opacity=0;setTimeout(()=>d.remove(),400);},ms);
+}
+function updateHUD(){
+  $('acorns').textContent=Math.min(player.acorns,8)+'/8';
+  $('cash').textContent=player.cash;
+  $('crabs').textContent=Math.min(player.crabsSlapped,5)+'/5';
+  $('cog').textContent=player.hasCog?'✅':(player.pumpFixed?'✔ done':'—');
+  $('hpfill').style.width=(100*player.hp/player.maxHp)+'%';
+}
+
+// ---------- dialog ----------
+let dlgQueue=[], dlgOpen=false, dlgChar=0, dlgTimer=null;
+function say(who,lines){ dlgQueue.push({who,lines}); if(!dlgOpen) nextDlg(); }
+function nextDlg(){
+  const cur=dlgQueue[0];
+  if(!cur||!cur.lines.length){ dlgQueue.shift(); if(!dlgQueue.length){ $('dialog').style.display='none'; dlgOpen=false; return; } return nextDlg(); }
+  dlgOpen=true; $('dialog').style.display='block';
+  $('dwho').textContent=cur.who;
+  const line=cur.lines.shift(); $('dtext').textContent=''; dlgChar=0;
+  clearInterval(dlgTimer); dlgTimer=setInterval(()=>{ dlgChar++; $('dtext').textContent=line.slice(0,dlgChar); if(dlgChar%3===0)sfx.talk(); if(dlgChar>=line.length)clearInterval(dlgTimer); },18);
+}
+function advanceDlg(){ if(!dlgOpen)return; const cur=dlgQueue[0]; if(!cur)return;
+  const full=$('dtext').textContent; // if typing, complete; else next
+  if(dlgTimer){ /* complete */ }
+  nextDlg();
+}
+$('dialog').addEventListener('click',advanceDlg);
+
+// ---------- interactions ----------
+let nearPad=null, nearNPC=null, nearChest=false, nearVend=false, nearMayor=false;
+function checkInteract(){
+  nearPad=null;nearNPC=null;nearChest=false;nearMayor=false;
+  for(const p of pads){ if(Math.hypot(player.pos.x-p.x,player.pos.z-p.z)<2.4){nearPad=p;break;} }
+  for(const n of npcs){ if(Math.hypot(player.pos.x-n.pos.x,player.pos.z-n.pos.z)<3){nearNPC=n;break;} }
+  if(Math.hypot(player.pos.x-chestPos.x,player.pos.z-chestPos.z)<3.2) nearChest=true;
+  const im=$('interact');
+  if(nearPad){im.style.display='block';im.textContent='E — '+nearPad.hint;}
+  else if(nearNPC){im.style.display='block';im.textContent='E — Talk to '+nearNPC.name;}
+  else if(nearChest){im.style.display='block';im.textContent='E — Open chest';}
+  else im.style.display='none';
+}
+function doInteract(){
+  if(dlgOpen){advanceDlg();return;}
+  if(nearNPC){talkTo(nearNPC);return;}
+  if(nearChest){openChest();return;}
+  if(nearPad){nearPad.action();return;}
+}
+function talkTo(n){
+  sfx.talk();
+  if(n===gull){
+    if(quest===0){ say('Gulliver the Gull',["Squawk! A SURFACE squirrel! Heh, you look soggy, pal.","Welcome to BUBBLE BOTTOM! Mayor Bubbles will trade a Golden Ferry Ticket for a little... heroism.","First: grab 8 GOLDEN ACORNS. They wash up everywhere. Then come back!"]); quest=1; }
+    else if(quest===1){ say('Gulliver the Gull', player.acorns>=8?["Eight acorns?! You're basically a local now!","BAD NEWS: Grumpy Crabs stole my sandwich. Slap 5 of 'em with that tail! (Click / F up close.)"]:["You got "+player.acorns+" of 8, champ. Check clam platforms — use the green ↟ pad!"]); }
+    else if(quest===2){ say('Gulliver the Gull', player.crabsSlapped>=5?["CRAB JUSTICE! I love it. Now — Puffer Pete's pump died. Grab the Rusty Cog from the chest on Crab Rock (pink cannon pad!) and take it to him."]:["Slap "+(5-player.crabsSlapped)+" more crabs! Get close, click, BONK."]); }
+    else say('Gulliver the Gull',["The Jelly King blocks the ferry channel... you got this, soggy!"]);
+  } else if(n===pete){
+    if(quest===3&&player.hasCog){ player.hasCog=false;player.pumpFixed=true;quest=4;gateOpen=true;
+      window._gateBar.position.y=20; bridgePlanks.forEach(p=>p.visible=true);
+      say('Puffer Pete',["*PFFFFFFFF* ...the ol' pump lives! You beautiful soggy hero!","I opened the Jelly Arena gate and dropped a bridge over the trench. Go bonk that Jelly King! Mayor Bubbles waits past the gate."]);
+      sfx.win();toast('Pump fixed! Arena gate OPEN!'); }
+    else if(quest<3) say('Puffer Pete',["Pump's dead, pressure's low, my day is RUINED. ...Gulliver sends you? Grab the Rusty Cog from Crab Rock first, then we'll talk."]);
+    else if(player.pumpFixed) say('Puffer Pete',["Pressure's perfect, baby! Go get that Jelly King!"]);
+    else say('Puffer Pete',["You need the RUSTY COG from the chest on Crab Rock. Pink cannon pad. Mind the crabs!"]);
+  } else if(n===mayor){
+    if(quest>=4&&bossDefeated){ quest=5; winGame(); }
+    else if(quest===4) say('Mayor Bubbles',["The Jelly King still blocks our channel! Defeat him and the Golden Ferry Ticket is yours!"]);
+    else say('Mayor Bubbles',["Hello, tourist! Do Gulliver's quests first — acorns, crabs, then Pete's pump. Bubble Bottom believes in you!"]);
+  }
+  setObjective();
+}
+function openChest(){
+  if(quest<2){ toast('A locked chest... Gulliver might know something.'); return; }
+  if(player.hasCog||player.pumpFixed){ toast('Empty chest. Just sea-crumbs.'); return; }
+  player.hasCog=true; if(quest===2&&player.crabsSlapped>=5) quest=3; else if(quest<3) quest=3;
+  window._chest.userData.lid.position.y=1.6;
+  sfx.cash();toast('Got the RUSTY COG! Take it to Puffer Pete!');setObjective();
+  say('Narrator',['You found the RUSTY COG! It smells like old pennies. Pete at the pump station will want this.']);
+}
+function buyShake(){
+  if(player.cash<40){toast('Kelp Shake costs $40! Slap crabs & grab cash.');sfx.hit();return;}
+  if(player.hp>=player.maxHp){toast('Fur HP already full!');return;}
+  player.cash-=40;player.hp=Math.min(player.maxHp,player.hp+60);sfx.heal();flashHeal();toast('Glug glug... +60 HP!');updateHUD();
+}
+function tryFixPump(fromPad){
+  if(player.pumpFixed){toast('Pump already purring.');return;}
+  if(player.hasCog){ talkTo(pete); }
+  else { toast(fromPad?'The pump needs a RUSTY COG (chest on Crab Rock)!':'Bring the Rusty Cog here!'); }
+}
+
+// ---------- combat ----------
+function tailSlap(){
+  if(player.slapCd>0||player.dead)return;
+  player.slapCd=0.45; sfx.slap();
+  player.mesh.userData.tail.rotation.x=-1.6; setTimeout(()=>{player.mesh.userData.tail.rotation.x=-0.5;},180);
+  let hitAny=false;
+  for(const e of [...enemies]){
+    if(!e.alive)continue;
+    const R=e.type==='king'?4.5:3;
+    const d=Math.hypot(e.mesh.position.x-player.pos.x,e.mesh.position.z-player.pos.z);
+    const yOk=Math.abs(e.mesh.position.y-(player.pos.y+1))<(e.type==='king'?4:3.2);
+    if(d<R&&yOk){ damageEnemy(e,1); hitAny=true; }
+  }
+  // slap ring fx
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(2,0.12,8,24),new THREE.MeshBasicMaterial({color:0xffe066,transparent:true,opacity:0.9}));
+  ring.rotation.x=Math.PI/2;ring.position.copy(player.pos);ring.position.y+=1;scene.add(ring);
+  const t0=performance.now();(function anim(){const t=(performance.now()-t0)/300;ring.scale.setScalar(1+t*1.5);ring.material.opacity=0.9-t;if(t<1)requestAnimationFrame(anim);else scene.remove(ring);})();
+  if(!hitAny){/* whiff */}
+}
+function damageEnemy(e,n){
+  e.hp-=n; e.hitCd=0.3; sfx.slap();
+  e.mesh.position.y+=0.4;
+  // knockback
+  const dx=e.mesh.position.x-player.pos.x,dz=e.mesh.position.z-player.pos.z,d=Math.hypot(dx,dz)||1;
+  e.mesh.position.x+=dx/d*1.2; e.mesh.position.z+=dz/d*1.2;
+  if(e.hp<=0){
+    e.alive=false; scene.remove(e.mesh);
+    const idx=enemies.indexOf(e); if(idx>=0)enemies.splice(idx,1);
+    if(e.type==='crab'){ player.crabsSlapped++; sfx.cash(); dropCash(e.mesh.position,rand(15,30));
+      toast('Crab slapped! ('+Math.min(player.crabsSlapped,5)+'/5)');
+      if(quest===1&&player.acorns>=8){quest=2;toast('Gulliver wants 5 crabs slapped!');}
+      else if(quest===2&&player.crabsSlapped>=5){quest=3;toast('Take the cog from Crab Rock chest to Pete!');say('Gulliver the Gull',['*distant squawk* CRAB JUSTICE! Now grab that Rusty Cog!']);}
+    } else if(e.type==='jelly'){ sfx.cash(); dropCash(e.mesh.position,rand(10,20)); toast('+jelly wobble down!'); }
+    else if(e.type==='king'){ onBossDown(); }
+    setObjective();
+  }
+  updateHUD();
+}
+function dropCash(pos,amount){
+  const n=Math.ceil(amount/10);
+  for(let i=0;i<n;i++){const m=cashMesh();m.position.set(pos.x+rand(-1,1),1.2,pos.z+rand(-1,1));m.userData.value=Math.ceil(amount/n);scene.add(m);cashDrops.push({mesh:m,phase:rand(0,6)});}
+}
+function hurtPlayer(n,from){
+  if(player.hurtCd>0||player.dead||!playing||paused)return;
+  player.hp-=n;player.hurtCd=0.9;sfx.hit();
+  if(from){const dx=player.pos.x-from.x,dz=player.pos.z-from.z,d=Math.hypot(dx,dz)||1;player.pos.x+=dx/d*1.5;player.pos.z+=dz/d*1.5;}
+  if(player.hp<=0){player.hp=0;loseGame();}
+  updateHUD();
+}
+function onBossDown(){
+  boss=null;bossDefeated=true;$('bossbar').style.display='none';sfx.win();
+  dropCash(arenaC,120);
+  toast('JELLY KING DEFEATED! See Mayor Bubbles! 👑',4000);
+  setObjective();
+  say('Mayor Bubbles',['You... you did it! The channel is clear! Come talk to me for your Golden Ferry Ticket!']);
+}
+function winGame(){
+  playing=false;sfx.win();
+  $('endtitle').textContent='🎫 FERRY TICKET EARNED!';
+  $('endsub').textContent='Bubble Bottom is saved, and Nutmeg is going home (mostly dry).';
+  $('endstats').innerHTML=`Time: ${Math.floor(elapsed/60)}:${String(Math.floor(elapsed%60)).padStart(2,'0')} · Acorns: ${player.acorns} · Crabs: ${player.crabsSlapped} · Cash: $${player.cash} · HP left: ${Math.ceil(player.hp)}`;
+  $('end').classList.remove('hidden');document.exitPointerLock&&document.exitPointerLock();
+}
+function loseGame(){
+  player.dead=true;playing=false;sfx.lose();
+  $('endtitle').textContent='💦 SOGGY DEFEAT';
+  $('endsub').textContent='Nutmeg got waterlogged... but every bad fur day ends!';
+  $('endstats').innerHTML=`Survived ${Math.floor(elapsed/60)}:${String(Math.floor(elapsed%60)).padStart(2,'0')} · Acorns: ${player.acorns}/8 · Crabs: ${player.crabsSlapped}/5`;
+  $('end').classList.remove('hidden');document.exitPointerLock&&document.exitPointerLock();
+}
+
+// ---------- input (desktop-first) ----------
+const keys={};
+addEventListener('keydown',e=>{
+  if(['Space','ArrowUp','ArrowDown'].includes(e.code))e.preventDefault();
+  keys[e.code]=true;
+  if(e.code==='KeyE')doInteract();
+  if(e.code==='KeyF')tailSlap();
+  if(e.code==='KeyM')toggleMute();
+  if(e.code==='KeyP'||e.code==='Escape'){ if(started&&playing)togglePause(); }
+});
+addEventListener('keyup',e=>keys[e.code]=false);
+renderer.domElement.addEventListener('click',()=>{
+  if(started&&playing&&!paused){ renderer.domElement.requestPointerLock&&renderer.domElement.requestPointerLock(); if(dlgOpen)advanceDlg(); }
+});
+document.addEventListener('mousemove',e=>{
+  if(document.pointerLockElement===renderer.domElement&&playing&&!paused){
+    player.camYaw-=e.movementX*0.0026; player.camPitch=clamp(player.camPitch+e.movementY*0.0022,-0.2,1.1);
+  }
+});
+renderer.domElement.addEventListener('mousedown',e=>{ if(e.button===0&&playing&&!paused)tailSlap(); });
+function toggleMute(){muted=!muted;$('mutewbtn').textContent='Mute: '+(muted?'on':'off');if(!muted)startMusic();}
+$('qbtn').onclick=()=>{
+  const hi=renderer.getPixelRatio()>1;
+  renderer.setPixelRatio(hi?1:Math.min(devicePixelRatio,2));
+  $('qbtn').textContent='Quality: '+(hi?'Low':'High');
+};
+function togglePause(){
+  paused=!paused;$('pause').classList.toggle('hidden',!paused);
+  if(paused)document.exitPointerLock&&document.exitPointerLock();
+}
+
+// ---------- buttons ----------
+$('playbtn').onclick=()=>{ audio();startMusic();$('title').classList.add('hidden');$('hud').classList.add('on');started=true;playing=true;paused=false;
+  renderer.domElement.requestPointerLock&&renderer.domElement.requestPointerLock();
+  say('Gulliver the Gull',["Squawk! Over here, soggy! Waddle over and press E, let's get you home!"]);setObjective(); };
+$('howbtn').onclick=()=>{const h=$('howtext');h.style.display=h.style.display==='none'?'block':'none';};
+$('resumebtn').onclick=togglePause;
+$('restartbtn').onclick=()=>location.reload();
+$('mutewbtn').onclick=toggleMute;
+$('againbtn').onclick=()=>location.reload();
+
+// ---------- ground height (platforms + bridge) ----------
+function groundAt(x,z){
+  // bridge over trench?
+  if(player.pumpFixed&&Math.abs(z-44)<2.2&&x>-22&&x<0) return 0.55;
+  for(const p of platforms){ if(Math.hypot(x-p.pos.x,z-p.pos.z)<p.r) return Math.max(0,p.y+0.4); }
+  return 0;
+}
+
+// ---------- main loop ----------
+const clock=new THREE.Clock();
+const camTarget=new THREE.Vector3();
+function update(dt){
+  elapsed+=dt;
+  // --- movement ---
+  const run=(keys.ShiftLeft||keys.ShiftRight)?1.6:1;
+  let mx=0,mz=0;
+  if(keys.KeyW||keys.ArrowUp)mz+=1; if(keys.KeyS||keys.ArrowDown)mz-=1;
+  if(keys.KeyA||keys.ArrowLeft)mx-=1; if(keys.KeyD||keys.ArrowRight)mx+=1;
+  const moving=(mx||mz)&&!player.dead;
+  const sp=(moving?6:0)*run*(player.pos.y>0.5?0.85:1);
+  const sy=Math.sin(player.camYaw),cy=Math.cos(player.camYaw);
+  const wx=(mx*cy - mz*sy), wz=(-mx*sy - mz*cy)*-1;
+  // note: forward = away from camera
+  const fx=-Math.sin(player.camYaw),fz=-Math.cos(player.camYaw);
+  const rx=-fz,rz=fx;
+  let vx=(fx*mz+rx*mx),vz=(fz*mz+rz*mx);
+  const vl=Math.hypot(vx,vz)||1; if(moving){vx/=vl;vz/=vl;}else{vx=vz=0;}
+  player.pos.x+=vx*sp*dt; player.pos.z+=vz*sp*dt;
+  // world bounds + trench fall
+  const r=Math.hypot(player.pos.x,player.pos.z);
+  if(r>58){ // fell in trench
+    hurtPlayer(10,null); player.pos.set(0,2,40); player.vy=3; toast('The trench! Ouch. (bridge comes after the pump)');
+  }
+  pushOut(player.pos,0.7);
+  // arena walls once boss starts
+  if(boss&&boss.alive){
+    const d=Math.hypot(player.pos.x-arenaC.x,player.pos.z-arenaC.z);
+    if(d>13){player.pos.x=arenaC.x+(player.pos.x-arenaC.x)/d*13;player.pos.z=arenaC.z+(player.pos.z-arenaC.z)/d*13;}
+  }
+  // gravity / jump
+  const g=groundAt(player.pos.x,player.pos.z);
+  player.vy-=22*dt;
+  if((keys.Space)&&player.grounded){player.vy=8.5;player.grounded=false;player.jumps=1;sfx.jump();}
+  else if(keys.Space&&!player.grounded&&player.jumps===1&&player.vy<1){player.vy=7;player.jumps=2;sfx.dbl();keys.Space=false;}
+  player.pos.y+=player.vy*dt;
+  if(player.pos.y<=g){player.pos.y=g;player.vy=0;player.grounded=true;player.jumps=0;}else player.grounded=false;
+  if(moving){player.yaw=Math.atan2(vx,vz);}
+  player.mesh.position.copy(player.pos);
+  player.mesh.rotation.y=player.yaw;
+  // swim bob + tail wag + squash
+  const t=performance.now()*0.001;
+  player.mesh.position.y+=player.grounded?Math.abs(Math.sin(t*8))*0.05*(moving?1:0):0;
+  player.mesh.userData.tail.rotation.y=Math.sin(t*6)*0.4;
+  player.mesh.userData.body.scale.y=player.grounded?1:1.15;
+  if(player.slapCd>0)player.slapCd-=dt;
+  if(player.hurtCd>0)player.hurtCd-=dt;
+  // slow bubble heal
+  if(player.hp<player.maxHp&&Math.floor(t)%3===0&&Math.random()<0.02){player.hp=Math.min(player.maxHp,player.hp+1);updateHUD();}
+
+  // --- camera ---
+  const cd=7.5, ch=3.2;
+  const cx=player.pos.x+Math.sin(player.camYaw)*Math.cos(player.camPitch)*cd;
+  const cz=player.pos.z+Math.cos(player.camYaw)*Math.cos(player.camPitch)*cd;
+  const cyy=player.pos.y+Math.sin(player.camPitch)*cd+ch;
+  camera.position.lerp(new THREE.Vector3(cx,cyy,cz),1-Math.pow(0.0001,dt));
+  camTarget.set(player.pos.x,player.pos.y+1.6,player.pos.z);
+  camera.lookAt(camTarget);
+
+  // --- acorns ---
+  for(const a of acorns){
+    if(a.taken)continue;
+    a.mesh.rotation.y+=dt*2;a.mesh.position.y+=Math.sin(t*3+a.phase)*dt*0.4;
+    if(Math.hypot(a.mesh.position.x-player.pos.x,a.mesh.position.z-player.pos.z)<1.3&&Math.abs(a.mesh.position.y-(player.pos.y+1))<2){
+      a.taken=true;scene.remove(a.mesh);player.acorns++;sfx.coin();flashHeal();
+      player.hp=Math.min(player.maxHp,player.hp+5);
+      toast(`Golden Acorn ${Math.min(player.acorns,8)}/8!`);
+      if(quest===1&&player.acorns>=8){quest=2;say('Gulliver the Gull',["Eight! Now about those sandwich-stealing crabs... slap 5! (Click/F up close.)"]);}
+      setObjective();
+    }
+  }
+  // --- cash ---
+  for(let i=cashDrops.length-1;i>=0;i--){const c=cashDrops[i];
+    c.mesh.rotation.y+=dt*3;c.phase+=dt;
+    if(Math.hypot(c.mesh.position.x-player.pos.x,c.mesh.position.z-player.pos.z)<1.4&&player.pos.y<2){
+      player.cash+=c.mesh.userData.value;scene.remove(c.mesh);cashDrops.splice(i,1);sfx.cash();updateHUD();
+    } else if(c.phase>25){scene.remove(c.mesh);cashDrops.splice(i,1);}
+  }
+  // --- crabs AI ---
+  for(const e of enemies){
+    if(!e.alive)continue;
+    if(e.hitCd>0)e.hitCd-=dt;
+    e.phase+=dt;
+    if(e.type==='crab'){
+      const dx=player.pos.x-e.mesh.position.x,dz=player.pos.z-e.mesh.position.z,d=Math.hypot(dx,dz);
+      if(d<12&&player.pos.y<2){e.mesh.position.x+=dx/d*3*dt;e.mesh.position.z+=dz/d*3*dt;e.mesh.rotation.y=Math.atan2(dx,dz);}
+      e.mesh.position.y=Math.abs(Math.sin(e.phase*6))*0.15;
+      const snap=Math.sin(e.phase*10)>0?0.3:-0.2;
+      if(e.mesh.userData.claws){e.mesh.userData.claws[0].position.z=0.4+snap;e.mesh.userData.claws[1].position.z=0.4-snap;}
+      if(d<1.4&&player.pos.y<1.5)hurtPlayer(12,e.mesh.position);
+    } else if(e.type==='jelly'){
+      e.mesh.position.y=2+Math.sin(e.phase*1.5)*0.8;
+      const dx=player.pos.x-e.mesh.position.x,dz=player.pos.z-e.mesh.position.z,d=Math.hypot(dx,dz);
+      if(d<10){e.mesh.position.x+=dx/d*1.5*dt;e.mesh.position.z+=dz/d*1.5*dt;}
+      e.mesh.rotation.y+=dt;
+      if(d<1.5&&Math.abs(e.mesh.position.y-(player.pos.y+1))<2)hurtPlayer(8,e.mesh.position);
+    }
+  }
+  // --- boss trigger / AI ---
+  const pdArena=Math.hypot(player.pos.x-arenaC.x,player.pos.z-arenaC.z);
+  if(gateOpen&&!boss&&!bossDefeated&&quest===4&&pdArena<14){
+    boss=spawnJelly(arenaC.x,arenaC.z,true);sfx.boss();
+    $('bossbar').style.display='block';
+    say('Jelly King',['TREMBLE, MAMMAL! I am the JELLY KING! *wobble wobble*','Bonk my crown 6 times if you can! My babies will tickle you!']);
+    toast('👑 JELLY KING! Bonk him!',3500);
+    boss.spawnT=0;
+  }
+  if(boss&&boss.alive){
+    boss.t+=dt;boss.phase+=dt;if(boss.hitCd>0)boss.hitCd-=dt;
+    $('bossfill').style.width=(100*boss.hp/6)+'%';$('bosshptext').textContent=boss.hp+'/6';
+    const m=boss.mesh;
+    m.position.y=3+Math.sin(boss.t*2)*0.6;m.rotation.y+=dt*0.8;
+    // hop toward player
+    const dx=player.pos.x-m.position.x,dz=player.pos.z-m.position.z,d=Math.hypot(dx,dz)||1;
+    m.position.x+=dx/d*Math.min(2.2,d)*dt;m.position.z+=dz/d*Math.min(2.2,d)*dt;
+    boss.mesh.position.x=m.position.x;boss.mesh.position.z=m.position.z;boss.x=m.position.x;boss.z=m.position.z;
+    if(d<2.6)hurtPlayer(18,m.position);
+    boss.spawnT+=dt;
+    if(boss.spawnT>6&&enemies.filter(e=>e.type==='jelly').length<3){boss.spawnT=0;const j=spawnJelly(m.position.x+rand(-4,4),m.position.z+rand(-4,4));toast('Jelly mini!');}
+    // tentacle wiggle
+    for(let i=0;i<10;i++){const tn=m.userData['t'+i];if(tn)tn.rotation.x=Math.sin(boss.t*5+i)*0.4;}
+  }
+  // --- NPC idle ---
+  gull.mesh.rotation.y=Math.sin(t*0.7)*0.5+Math.atan2(player.pos.x-gull.pos.x,player.pos.z-gull.pos.z)*0.2;
+  gull.mesh.position.y=Math.abs(Math.sin(t*3))*0.15;
+  pete.mesh.position.y=Math.sin(t*2)*0.15;
+  pete.mesh.rotation.y+=dt*0.4;
+  mayor.mesh.rotation.y=Math.sin(t*0.5)*0.3;
+  if(window._pumpWheel&&!player.pumpFixed)window._pumpWheel.rotation.z+=dt*0.3;
+  // pads ring pulse
+  for(const p of pads)p.mesh.userData.ring.material.emissiveIntensity=0.7+Math.sin(t*4)*0.3;
+  // bubbles rise
+  const bp=window._bubblePts.geometry.attributes.position;
+  for(let i=0;i<bp.count;i++){let y=bp.getY(i)+dt*1.2;if(y>24)y=0;bp.setY(i,y);}
+  bp.needsUpdate=true;
+  // mayor auto-win check
+  if(quest===4&&boss===null&&$('bossbar').style.display==='none'&&gateOpen){
+    // boss was defeated (boss set null in onBossDown) -> quest text
+  }
+  checkInteract();
+  drawMinimap();
+}
+
+// ---------- minimap ----------
+const mm=$('minimap').getContext('2d');
+function drawMinimap(){
+  mm.clearRect(0,0,150,150);
+  mm.fillStyle='#06283d';mm.beginPath();mm.arc(75,75,72,0,7);mm.fill();
+  const dot=(x,z,c,s=4)=>{mm.fillStyle=c;mm.beginPath();mm.arc(75+x*0.9,75+z*0.9,s,0,7);mm.fill();};
+  dot(0,44,'#7c3aed',6);
+  for(const a of acorns)if(!a.taken)dot(a.mesh.position.x,a.mesh.position.z,'#ffd34d',3);
+  for(const e of enemies)dot(e.mesh.position.x,e.mesh.position.z,e.type==='crab'?'#ff5d5d':'#ff9edf',3);
+  dot(gull.pos.x,gull.pos.z,'#7dd3fc',4);dot(pete.pos.x,pete.pos.z,'#4ade80',4);
+  dot(player.pos.x,player.pos.z,'#fff',5);
+  mm.strokeStyle='#ffffff66';mm.lineWidth=2;mm.beginPath();mm.arc(75,75,72,0,7);mm.stroke();
+}
+
+// ---------- boot ----------
+setObjective();updateHUD();
+$('loading').textContent='reef ready ✔ — click DIVE IN';
+$('playbtn').style.display='inline-block';$('howbtn').style.display='inline-block';
+renderer.setAnimationLoop(()=>{
+  const dt=Math.min(clock.getDelta(),0.05);
+  if(started&&playing&&!paused)update(dt);
+  else { // idle title camera orbit
+    const t=performance.now()*0.0002;
+    camera.position.set(Math.sin(t)*30,14,Math.cos(t)*30);
+    camera.lookAt(0,2,0);
+    // still animate water/bubbles lightly
+    for(const a of acorns)if(!a.taken)a.mesh.rotation.y+=dt;
+  }
+  renderer.render(scene,camera);
+});
+window.__game={player,get quest(){return quest},get boss(){return boss},enemies,start:()=>$('playbtn').click(),slap:tailSlap,interact:doInteract,
+  debug:{setQuest(q){quest=q;setObjective();},openGate(){gateOpen=true;window._gateBar.position.y=20;bridgePlanks.forEach(p=>p.visible=true);},giveCog(){player.hasCog=true;}}};
+</script>
+</body>
+</html>
